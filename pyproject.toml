@@ -1,0 +1,17 @@
+[project]
+name = "nf-engine"
+version = "0.1.0"
+description = "Candidate keys and 2NF / 3NF / BCNF checks from functional dependencies"
+requires-python = ">=3.10"
+license = "MIT"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+include = ["python/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

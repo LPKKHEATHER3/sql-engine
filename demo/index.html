@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sql-engine playground</title>
+<meta name="description" content="Run SQL SELECT queries in the browser with a dependency-free JavaScript interpreter.">
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1f23; --soft: #5f6670; --line: #e2e4e8;
+    --accent: #2f6fde; --accent-ink: #ffffff; --null: #9aa1ab;
+    --err-bg: #fdecec; --err-ink: #8a1c1c; --warn-bg: #fff6e0; --warn-ink: #7a5300;
+    --ok-ink: #1d6b3a; --code-bg: #f1f2f4;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171a; --panel: #1d2024; --ink: #e7e9ec; --soft: #9aa1ab; --line: #2e3238;
+      --accent: #6c9cff; --accent-ink: #0b1020; --null: #6b727c;
+      --err-bg: #3a1d1f; --err-ink: #ffb4b4; --warn-bg: #3a2f14; --warn-ink: #ffd88a;
+      --ok-ink: #7fd69c; --code-bg: #25292e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1200px; margin: 0 auto; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; color: var(--soft); }
+  main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 40px;
+    display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } aside { order: 2; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  aside h2, section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--soft); margin: 4px 0 8px; }
+  .table-name { font-family: var(--mono); font-weight: 600; background: none; border: 0; color: var(--accent);
+    cursor: pointer; padding: 0; font-size: 14px; }
+  .cols { font-family: var(--mono); font-size: 12.5px; color: var(--soft); margin: 2px 0 10px; word-break: break-word; }
+  .examples button { display: block; width: 100%; text-align: left; margin: 0 0 6px; padding: 6px 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 6px;
+    cursor: pointer; font: inherit; font-size: 13px; }
+  .examples button:hover, .table-name:hover { text-decoration: underline; }
+  textarea { width: 100%; min-height: 150px; resize: vertical; font: 14px/1.5 var(--mono);
+    padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); color: var(--ink); }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 10px 0; }
+  .run { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px;
+    padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+  .hint-key { color: var(--soft); font-size: 13px; }
+  label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .msg { border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+  .msg.error { background: var(--err-bg); color: var(--err-ink); }
+  .msg.warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .msg .code { font-family: var(--mono); font-size: 12px; opacity: .8; }
+  .meta { color: var(--ok-ink); font-size: 13px; margin: 8px 0; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; white-space: nowrap; }
+  th { font-family: var(--mono); font-size: 12.5px; color: var(--soft); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.null { color: var(--null); font-style: italic; }
+  footer { max-width: 1200px; margin: 0 auto; padding: 0 16px 24px; color: var(--soft); font-size: 13px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>sql-engine playground</h1>
+  <p>A SQL <code>SELECT</code> interpreter written in plain JavaScript. Everything runs in your browser; nothing is sent anywhere.</p>
+</header>
+<main>
+  <aside>
+    <div class="card">
+      <h2>Tables</h2>
+      <div id="schema"></div>
+      <h2>Examples</h2>
+      <div class="examples" id="examples"></div>
+    </div>
+  </aside>
+  <section>
+    <div class="card">
+      <label for="sql" class="hint-key">Query</label>
+      <textarea id="sql" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+      <div class="bar">
+        <button class="run" id="run" type="button">Run</button>
+        <span class="hint-key">Ctrl / Cmd + Enter</span>
+        <label><input type="checkbox" id="strict" checked> Strict mode</label>
+      </div>
+      <div id="out" aria-live="polite"></div>
+    </div>
+  </section>
+</main>
+<footer>Sample data is fictional. Strict mode turns <code>= NULL</code> comparisons into errors; with it off they run and show a warning.</footer>
+
+<script type="module">
+import { createDatabase, SQLError } from '../src/dbsql.js';
+import { SHOP_TABLES } from '../data/shop.js';
+
+const db = createDatabase(SHOP_TABLES);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const EXAMPLES = [
+  ['Revenue per customer (LEFT JOIN + GROUP BY)',
+   'SELECT c.name, COUNT(DISTINCT o.order_id) AS orders,\n       SUM(i.quantity * i.unit_price) AS revenue\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.customer_id\nLEFT JOIN order_items i ON i.order_id = o.order_id\nGROUP BY c.name\nORDER BY revenue DESC NULLS LAST'],
+  ['Suppliers and products (FULL OUTER JOIN)',
+   'SELECT s.name AS supplier, p.name AS product\nFROM suppliers s\nFULL OUTER JOIN products p ON p.supplier_id = s.supplier_id'],
+  ['Above category average (correlated subquery)',
+   'SELECT p.name, p.category, p.price\nFROM products p\nWHERE p.price > (SELECT AVG(q.price) FROM products q\n                 WHERE q.category = p.category)'],
+  ['Never ordered (NOT EXISTS)',
+   'SELECT name FROM products p\nWHERE NOT EXISTS (SELECT 1 FROM order_items i\n                  WHERE i.product_id = p.product_id)'],
+  ['NOT IN meets NULL (empty result!)',
+   '-- orders.customer_id contains a NULL (a guest checkout),\n-- so NOT IN can never be TRUE.\nSELECT name FROM customers\nWHERE customer_id NOT IN (SELECT customer_id FROM orders)'],
+  ['Strict mode: = NULL',
+   'SELECT name FROM customers WHERE city = NULL'],
+  ['Strict GROUP BY rule',
+   'SELECT category, name, COUNT(*)\nFROM products\nGROUP BY category'],
+];
+
+function renderSchema() {
+  $('schema').innerHTML = Object.entries(SHOP_TABLES).map(([name, t]) =>
+    `<button class="table-name" type="button" data-table="${esc(name)}">${esc(name)}</button>` +
+    `<div class="cols">${t.columns.map(esc).join(', ')}</div>`).join('');
+  $('schema').addEventListener('click', (e) => {
+    const name = e.target.dataset && e.target.dataset.table;
+    if (name) { $('sql').value = `SELECT * FROM ${name}`; run(); }
+  });
+  $('examples').innerHTML = EXAMPLES.map(([label], i) =>
+    `<button type="button" data-i="${i}">${esc(label)}</button>`).join('');
+  $('examples').addEventListener('click', (e) => {
+    const i = e.target.dataset && e.target.dataset.i;
+    if (i !== undefined) { $('sql').value = EXAMPLES[i][1]; run(); }
+  });
+}
+
+function cell(v) {
+  if (v === null || v === undefined) return '<td class="null">NULL</td>';
+  if (typeof v === 'number') return `<td class="num">${esc(Number.isInteger(v) ? v : +v.toFixed(6))}</td>`;
+  return `<td>${esc(v)}</td>`;
+}
+
+function run() {
+  const sql = $('sql').value;
+  const out = $('out');
+  const t0 = performance.now();
+  try {
+    const r = db.run(sql, { strict: $('strict').checked });
+    const ms = (performance.now() - t0).toFixed(1);
+    const warn = r.warnings.map((w) =>
+      `<div class="msg warn"><strong>Warning:</strong> ${esc(w.message)} <span class="code">${esc(w.code)}</span></div>`).join('');
+    out.innerHTML = warn +
+      `<div class="meta">${r.rows.length} row${r.rows.length === 1 ? '' : 's'} in ${ms} ms</div>` +
+      `<div class="scroll"><table><thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead>` +
+      `<tbody>${r.rows.map((row) => `<tr>${row.map(cell).join('')}</tr>`).join('')}</tbody></table></div>`;
+  } catch (e) {
+    if (!(e instanceof SQLError)) throw e;
+    out.innerHTML = `<div class="msg error"><strong>${esc(e.message)}</strong>` +
+      (e.hint ? `<div>${esc(e.hint)}</div>` : '') + `<div class="code">${esc(e.code)}</div></div>`;
+  }
+}
+
+$('run').addEventListener('click', run);
+$('strict').addEventListener('change', run);
+$('sql').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
+});
+renderSchema();
+$('sql').value = EXAMPLES[0][1];
+run();
+</script>
+</body>
+</html>

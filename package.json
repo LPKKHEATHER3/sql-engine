@@ -1,0 +1,29 @@
+{
+  "name": "sql-engine",
+  "version": "0.1.0",
+  "description": "A small, dependency-free SQL SELECT interpreter in JavaScript, verified against SQLite with differential and fuzz tests.",
+  "type": "module",
+  "main": "src/dbsql.js",
+  "exports": {
+    ".": "./src/dbsql.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "fuzz": "node tests/fuzz.test.js",
+    "lint": "eslint .",
+    "demo": "node scripts/serve.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "sql.js": "^1.16.0"
+  }
+}
